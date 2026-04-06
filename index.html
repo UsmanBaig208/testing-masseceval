@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Twilio Voice + SMS Console</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f4f1ea;
+      --panel: #fefbf6;
+      --ink: #212121;
+      --muted: #6c665c;
+      --accent: #1f7a8c;
+      --accent-soft: #cae9ef;
+      --good: #2d8f5b;
+      --warn: #cc7a00;
+      --bad: #bf3c34;
+      --edge: #d9d2c7;
+      --shadow: 0 12px 30px rgba(50, 45, 36, 0.12);
+      --radius: 16px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Space Grotesk', sans-serif;
+      color: var(--ink);
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 8% 14%, #d4efe3 0%, transparent 32%),
+        radial-gradient(circle at 92% 88%, #f8dfba 0%, transparent 35%),
+        var(--bg);
+      padding: 18px;
+    }
+
+    .shell {
+      max-width: 1120px;
+      margin: 0 auto;
+      display: grid;
+      gap: 14px;
+      grid-template-columns: 1.1fr 1fr;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--edge);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 18px;
+    }
+
+    .hero {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+    }
+
+    .hero h1 {
+      font-size: clamp(1.2rem, 3.5vw, 1.9rem);
+      letter-spacing: -0.02em;
+    }
+
+    .hero p {
+      color: var(--muted);
+      font-size: 0.92rem;
+      margin-top: 4px;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border-radius: 999px;
+      border: 1px solid var(--edge);
+      padding: 6px 12px;
+      font-size: 0.83rem;
+      background: #fff;
+    }
+
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #969089;
+    }
+
+    .ready .dot { background: var(--good); }
+    .calling .dot, .incoming .dot { background: var(--warn); }
+    .active .dot { background: var(--accent); }
+    .error .dot { background: var(--bad); }
+
+    .grid {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: 1fr 1fr;
+    }
+
+    h2 {
+      font-size: 1.05rem;
+      margin-bottom: 10px;
+    }
+
+    .field {
+      margin-bottom: 10px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 0.78rem;
+      color: var(--muted);
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    input, textarea {
+      width: 100%;
+      border: 1px solid var(--edge);
+      border-radius: 10px;
+      padding: 11px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.9rem;
+      background: #fff;
+      color: var(--ink);
+    }
+
+    textarea { min-height: 90px; resize: vertical; }
+
+    .row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: 0;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-weight: 700;
+      cursor: pointer;
+      font-size: 0.86rem;
+      transition: transform .12s ease, opacity .12s ease;
+    }
+
+    button:hover { transform: translateY(-1px); }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-good { background: var(--good); color: #fff; }
+    .btn-warn { background: var(--warn); color: #fff; }
+    .btn-bad { background: var(--bad); color: #fff; }
+    .btn-soft { background: var(--accent-soft); color: #07424f; }
+
+    .mono {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.8rem;
+    }
+
+    .timer {
+      margin-top: 8px;
+      font-size: 0.92rem;
+      color: var(--muted);
+    }
+
+    .incoming-box {
+      display: none;
+      margin-top: 10px;
+      border: 1px dashed #df9b3b;
+      background: #fff4dd;
+      padding: 10px;
+      border-radius: 12px;
+    }
+
+    .log-list {
+      list-style: none;
+      max-height: 280px;
+      overflow: auto;
+      border: 1px solid var(--edge);
+      border-radius: 12px;
+      background: #fff;
+    }
+
+    .log-list li {
+      padding: 10px;
+      border-bottom: 1px solid #efe9dd;
+      font-size: 0.83rem;
+      line-height: 1.4;
+    }
+
+    .log-list li:last-child { border-bottom: 0; }
+
+    .hint { color: var(--muted); font-size: 0.8rem; margin-top: 6px; }
+
+    .auth-overlay {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      background: rgba(21, 21, 21, 0.45);
+      backdrop-filter: blur(2px);
+      z-index: 10;
+    }
+
+    .auth-card {
+      width: min(420px, 92vw);
+      background: var(--panel);
+      border-radius: 18px;
+      border: 1px solid var(--edge);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+      padding: 20px;
+    }
+
+    .auth-msg { color: var(--bad); margin-top: 8px; min-height: 20px; font-size: 0.83rem; }
+
+    @media (max-width: 940px) {
+      .shell { grid-template-columns: 1fr; }
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="auth-overlay" id="authOverlay">
+    <form class="auth-card" id="loginForm">
+      <h2>Sign in</h2>
+      <p class="hint">JWT-protected access for Voice, SMS, and logs.</p>
+      <div class="field">
+        <label for="usernameInput">Username</label>
+        <input id="usernameInput" type="text" autocomplete="username" required />
+      </div>
+      <div class="field">
+        <label for="passwordInput">Password</label>
+        <input id="passwordInput" type="password" autocomplete="current-password" required />
+      </div>
+      <div class="row">
+        <button class="btn-primary" type="submit" id="loginBtn">Sign In</button>
+      </div>
+      <div class="auth-msg" id="authMsg"></div>
+    </form>
+  </div>
+
+  <main class="shell">
+    <section class="panel hero">
+      <div>
+        <h1>Voice + SMS Command Console</h1>
+        <p id="identityText">Authentication required</p>
+      </div>
+      <div class="status-pill" id="statusPill">
+        <span class="dot"></span>
+        <span id="statusText">Locked</span>
+      </div>
+      <button class="btn-soft" id="logoutBtn" type="button">Logout</button>
+    </section>
+
+    <section class="panel">
+      <h2>Voice Calling</h2>
+      <div class="field">
+        <label for="phoneInput">Dial To (E.164 or client:name)</label>
+        <input type="tel" id="phoneInput" placeholder="+923001234567" disabled>
+      </div>
+      <div class="row">
+        <button class="btn-good" id="callBtn" disabled type="button">Call</button>
+        <button class="btn-warn" id="muteBtn" type="button" style="display:none;">Mute</button>
+        <button class="btn-bad" id="hangBtn" type="button" style="display:none;">Hang Up</button>
+      </div>
+      <div class="timer" id="timer">Call timer: 00:00</div>
+
+      <div class="incoming-box" id="incomingBox">
+        <div class="mono" id="incomingLabel">Incoming call...</div>
+        <div class="row" style="margin-top:8px;">
+          <button class="btn-good" id="acceptIncomingBtn" type="button">Accept</button>
+          <button class="btn-bad" id="rejectIncomingBtn" type="button">Reject</button>
+        </div>
+      </div>
+
+      <p class="hint">Both outbound and inbound browser calls are supported in this UI.</p>
+    </section>
+
+    <section class="panel">
+      <h2>Send SMS</h2>
+      <div class="field">
+        <label for="smsTo">To Number (E.164)</label>
+        <input id="smsTo" placeholder="+923001234567" disabled>
+      </div>
+      <div class="field">
+        <label for="smsBody">Message</label>
+        <textarea id="smsBody" placeholder="Type your message..." disabled></textarea>
+      </div>
+      <div class="row">
+        <button class="btn-primary" id="sendSmsBtn" type="button" disabled>Send SMS</button>
+      </div>
+      <p class="hint">SMS logs are synced from server and persisted locally.</p>
+    </section>
+
+    <section class="panel">
+      <h2>Call Logs (localStorage)</h2>
+      <ul class="log-list" id="callLogs"></ul>
+    </section>
+
+    <section class="panel">
+      <h2>SMS Logs (localStorage)</h2>
+      <ul class="log-list" id="smsLogs"></ul>
+    </section>
+
+    <section class="panel" style="grid-column: 1 / -1;">
+      <h2>Transcriptions + Server Events</h2>
+      <div class="grid">
+        <div>
+          <p class="hint">Browser speech transcription (during active call)</p>
+          <ul class="log-list" id="transcriptionLogs"></ul>
+        </div>
+        <div>
+          <p class="hint">Webhook-driven call/SMS backend logs</p>
+          <ul class="log-list" id="serverLogs"></ul>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@twilio/voice-sdk@2.12.0/dist/twilio.min.js"></script>
+  <script>
+    const STORAGE_KEY = 'twilio_ui_logs_v1';
+    const AUTH_KEY = 'twilio_jwt_token';
+    const state = {
+      token: localStorage.getItem(AUTH_KEY) || '',
+      identity: '',
+      voiceDevice: null,
+      activeCall: null,
+      incomingCall: null,
+      muted: false,
+      timerSecs: 0,
+      timerRef: null,
+      pollRef: null,
+      speechRecognition: null,
+      logs: loadLogs(),
+      serverLogIds: new Set(),
+    };
+
+    const ui = {
+      statusPill: document.getElementById('statusPill'),
+      statusText: document.getElementById('statusText'),
+      identityText: document.getElementById('identityText'),
+      authOverlay: document.getElementById('authOverlay'),
+      loginForm: document.getElementById('loginForm'),
+      usernameInput: document.getElementById('usernameInput'),
+      passwordInput: document.getElementById('passwordInput'),
+      authMsg: document.getElementById('authMsg'),
+      logoutBtn: document.getElementById('logoutBtn'),
+      phoneInput: document.getElementById('phoneInput'),
+      callBtn: document.getElementById('callBtn'),
+      muteBtn: document.getElementById('muteBtn'),
+      hangBtn: document.getElementById('hangBtn'),
+      timer: document.getElementById('timer'),
+      incomingBox: document.getElementById('incomingBox'),
+      incomingLabel: document.getElementById('incomingLabel'),
+      acceptIncomingBtn: document.getElementById('acceptIncomingBtn'),
+      rejectIncomingBtn: document.getElementById('rejectIncomingBtn'),
+      smsTo: document.getElementById('smsTo'),
+      smsBody: document.getElementById('smsBody'),
+      sendSmsBtn: document.getElementById('sendSmsBtn'),
+      callLogs: document.getElementById('callLogs'),
+      smsLogs: document.getElementById('smsLogs'),
+      transcriptionLogs: document.getElementById('transcriptionLogs'),
+      serverLogs: document.getElementById('serverLogs'),
+    };
+
+    function loadLogs() {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) {
+        return { calls: [], sms: [], transcriptions: [], server: [] };
+      }
+      try {
+        const data = JSON.parse(raw);
+        return {
+          calls: Array.isArray(data.calls) ? data.calls : [],
+          sms: Array.isArray(data.sms) ? data.sms : [],
+          transcriptions: Array.isArray(data.transcriptions) ? data.transcriptions : [],
+          server: Array.isArray(data.server) ? data.server : [],
+        };
+      } catch {
+        return { calls: [], sms: [], transcriptions: [], server: [] };
+      }
+    }
+
+    function persistLogs() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state.logs));
+    }
+
+    function pushLog(bucket, payload) {
+      const row = { at: new Date().toISOString(), ...payload };
+      state.logs[bucket].unshift(row);
+      state.logs[bucket] = state.logs[bucket].slice(0, 200);
+      persistLogs();
+      renderLogs();
+    }
+
+    function setStatus(text, cls) {
+      ui.statusPill.className = `status-pill ${cls}`;
+      ui.statusText.textContent = text;
+    }
+
+    function setControlsEnabled(enabled) {
+      ui.phoneInput.disabled = !enabled;
+      ui.callBtn.disabled = !enabled;
+      ui.smsTo.disabled = !enabled;
+      ui.smsBody.disabled = !enabled;
+      ui.sendSmsBtn.disabled = !enabled;
+    }
+
+    function setCallButtons(active) {
+      ui.callBtn.style.display = active ? 'none' : 'inline-block';
+      ui.hangBtn.style.display = active ? 'inline-block' : 'none';
+      ui.muteBtn.style.display = active ? 'inline-block' : 'none';
+    }
+
+    function startTimer() {
+      stopTimer();
+      state.timerSecs = 0;
+      state.timerRef = setInterval(() => {
+        state.timerSecs += 1;
+        const m = String(Math.floor(state.timerSecs / 60)).padStart(2, '0');
+        const s = String(state.timerSecs % 60).padStart(2, '0');
+        ui.timer.textContent = `Call timer: ${m}:${s}`;
+      }, 1000);
+    }
+
+    function stopTimer() {
+      clearInterval(state.timerRef);
+      state.timerRef = null;
+      ui.timer.textContent = 'Call timer: 00:00';
+    }
+
+    function authHeaders() {
+      return {
+        'Authorization': `Bearer ${state.token}`,
+        'Content-Type': 'application/json'
+      };
+    }
+
+    async function login(username, password) {
+      const resp = await fetch('/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      if (!resp.ok) {
+        throw new Error('Invalid credentials');
+      }
+      const data = await resp.json();
+      state.token = data.access_token;
+      localStorage.setItem(AUTH_KEY, state.token);
+    }
+
+    async function whoAmI() {
+      const resp = await fetch('/auth/me', { headers: authHeaders() });
+      if (!resp.ok) {
+        throw new Error('Token invalid');
+      }
+      const data = await resp.json();
+      state.identity = data.username;
+      ui.identityText.textContent = `Logged in as ${data.username}`;
+    }
+
+    function logout() {
+      localStorage.removeItem(AUTH_KEY);
+      state.token = '';
+      state.identity = '';
+      clearInterval(state.pollRef);
+      if (state.voiceDevice) {
+        try { state.voiceDevice.destroy(); } catch {}
+      }
+      setControlsEnabled(false);
+      setCallButtons(false);
+      setStatus('Locked', '');
+      ui.authOverlay.style.display = 'grid';
+      ui.identityText.textContent = 'Authentication required';
+    }
+
+    function bindCallEvents(call, direction) {
+      call.on('accept', () => {
+        state.activeCall = call;
+        setStatus('On Call', 'active');
+        setCallButtons(true);
+        startTimer();
+        startBrowserTranscription();
+        pushLog('calls', {
+          event: 'call_accept',
+          direction,
+          from: call.parameters.From || '-',
+          to: call.parameters.To || '-',
+          sid: call.parameters.CallSid || '-'
+        });
+      });
+
+      call.on('disconnect', () => {
+        stopBrowserTranscription();
+        stopTimer();
+        setCallButtons(false);
+        setStatus('Ready', 'ready');
+        state.activeCall = null;
+        state.muted = false;
+        ui.muteBtn.textContent = 'Mute';
+        pushLog('calls', {
+          event: 'call_disconnect',
+          direction,
+          sid: call.parameters.CallSid || '-',
+          duration_secs: state.timerSecs
+        });
+      });
+
+      call.on('cancel', () => {
+        pushLog('calls', { event: 'call_cancel', direction });
+        ui.incomingBox.style.display = 'none';
+        setStatus('Ready', 'ready');
+      });
+
+      call.on('reject', () => {
+        pushLog('calls', { event: 'call_reject', direction });
+        ui.incomingBox.style.display = 'none';
+        setStatus('Ready', 'ready');
+      });
+
+      call.on('error', (err) => {
+        setStatus('Error', 'error');
+        pushLog('calls', { event: 'call_error', direction, message: err.message || String(err) });
+      });
+    }
+
+    async function initVoice() {
+      if (!window.Twilio || !Twilio.Device) {
+        throw new Error('Twilio Voice SDK could not load.');
+      }
+
+      const resp = await fetch('/token', { headers: authHeaders() });
+      if (!resp.ok) {
+        throw new Error('Token API unauthorized.');
+      }
+
+      const data = await resp.json();
+      state.voiceDevice = new Twilio.Device(data.token, { codecPreferences: ['opus', 'pcmu'] });
+
+      state.voiceDevice.on('registered', () => {
+        setStatus('Ready', 'ready');
+        setControlsEnabled(true);
+      });
+
+      state.voiceDevice.on('incoming', (call) => {
+        state.incomingCall = call;
+        bindCallEvents(call, 'inbound');
+        setStatus('Incoming Call', 'incoming');
+        ui.incomingLabel.textContent = `Incoming from ${call.parameters.From || 'Unknown'}`;
+        ui.incomingBox.style.display = 'block';
+        pushLog('calls', {
+          event: 'incoming_alert',
+          from: call.parameters.From || '-',
+          sid: call.parameters.CallSid || '-'
+        });
+      });
+
+      state.voiceDevice.on('error', (err) => {
+        setStatus('Error', 'error');
+        pushLog('calls', { event: 'device_error', message: err.message || String(err) });
+      });
+
+      await state.voiceDevice.register();
+    }
+
+    async function makeCall() {
+      const to = ui.phoneInput.value.trim();
+      if (!to) {
+        alert('Enter a destination first.');
+        return;
+      }
+      setStatus('Dialing', 'calling');
+      pushLog('calls', { event: 'outbound_start', to });
+      try {
+        const call = await state.voiceDevice.connect({ params: { To: to } });
+        bindCallEvents(call, 'outbound');
+      } catch (err) {
+        setStatus('Error', 'error');
+        pushLog('calls', { event: 'outbound_error', to, message: err.message || String(err) });
+      }
+    }
+
+    function hangUp() {
+      if (!state.voiceDevice) return;
+      state.voiceDevice.disconnectAll();
+      pushLog('calls', { event: 'manual_hangup' });
+    }
+
+    function toggleMute() {
+      if (!state.activeCall) return;
+      state.muted = !state.muted;
+      state.activeCall.mute(state.muted);
+      ui.muteBtn.textContent = state.muted ? 'Unmute' : 'Mute';
+      pushLog('calls', { event: state.muted ? 'muted' : 'unmuted' });
+    }
+
+    async function sendSms() {
+      const to = ui.smsTo.value.trim();
+      const body = ui.smsBody.value.trim();
+      if (!to || !body) {
+        alert('Enter both SMS number and message body.');
+        return;
+      }
+      ui.sendSmsBtn.disabled = true;
+      try {
+        const resp = await fetch('/sms/send', {
+          method: 'POST',
+          headers: authHeaders(),
+          body: JSON.stringify({ to, body })
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+          throw new Error(data.detail || 'SMS failed');
+        }
+        pushLog('sms', {
+          event: 'sms_sent',
+          sid: data.sid,
+          to: data.to,
+          status: data.status,
+          body
+        });
+        ui.smsBody.value = '';
+      } catch (err) {
+        pushLog('sms', { event: 'sms_error', to, message: err.message || String(err) });
+      } finally {
+        ui.sendSmsBtn.disabled = false;
+      }
+    }
+
+    function startBrowserTranscription() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        pushLog('transcriptions', { event: 'transcription_unavailable', text: 'Browser API not supported' });
+        return;
+      }
+
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'en-US';
+      recognition.continuous = true;
+      recognition.interimResults = true;
+
+      recognition.onresult = (event) => {
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const result = event.results[i];
+          if (result.isFinal) {
+            pushLog('transcriptions', {
+              event: 'browser_transcript',
+              text: result[0].transcript,
+              confidence: result[0].confidence || 0,
+              sid: state.activeCall?.parameters?.CallSid || '-'
+            });
+          }
+        }
+      };
+
+      recognition.onerror = (event) => {
+        pushLog('transcriptions', { event: 'transcription_error', text: event.error || 'unknown_error' });
+      };
+
+      recognition.start();
+      state.speechRecognition = recognition;
+      pushLog('transcriptions', { event: 'transcription_started', text: 'Browser speech recognition active' });
+    }
+
+    function stopBrowserTranscription() {
+      if (!state.speechRecognition) return;
+      try { state.speechRecognition.stop(); } catch {}
+      state.speechRecognition = null;
+      pushLog('transcriptions', { event: 'transcription_stopped', text: 'Recognition stopped' });
+    }
+
+    function renderLogs() {
+      const toLine = (entry) => `${new Date(entry.at).toLocaleString()} | ${Object.entries(entry).filter(([k]) => k !== 'at').map(([k, v]) => `${k}:${v}`).join(' | ')}`;
+      ui.callLogs.innerHTML = state.logs.calls.map((x) => `<li>${toLine(x)}</li>`).join('') || '<li>No call logs yet.</li>';
+      ui.smsLogs.innerHTML = state.logs.sms.map((x) => `<li>${toLine(x)}</li>`).join('') || '<li>No SMS logs yet.</li>';
+      ui.transcriptionLogs.innerHTML = state.logs.transcriptions.map((x) => `<li>${toLine(x)}</li>`).join('') || '<li>No transcription logs yet.</li>';
+      ui.serverLogs.innerHTML = state.logs.server.map((x) => `<li>${toLine(x)}</li>`).join('') || '<li>No server events yet.</li>';
+    }
+
+    function mergeServerEvent(entry, source) {
+      const eventId = `${source}-${entry.logged_at || ''}-${entry.event || ''}-${entry.sid || entry.call_sid || ''}`;
+      if (state.serverLogIds.has(eventId)) return;
+      state.serverLogIds.add(eventId);
+
+      if (source === 'sms') {
+        pushLog('sms', {
+          event: entry.event || 'sms_event',
+          sid: entry.sid || '-',
+          status: entry.message_status || entry.status || '-',
+          from: entry.from || '-',
+          to: entry.to || '-',
+          body: entry.body || '-',
+          error: entry.error_message || '-'
+        });
+      }
+
+      pushLog('server', {
+        event: `${source}:${entry.event || 'event'}`,
+        sid: entry.sid || entry.call_sid || '-',
+        status: entry.call_status || entry.message_status || entry.transcription_status || '-',
+        from: entry.from || '-',
+        to: entry.to || '-',
+        detail: entry.transcription_text || entry.body || entry.error_message || '-'
+      });
+    }
+
+    async function pollServerLogs() {
+      try {
+        const resp = await fetch('/api/server-logs', { headers: authHeaders() });
+        if (!resp.ok) {
+          if (resp.status === 401) logout();
+          return;
+        }
+        const data = await resp.json();
+        (data.calls || []).forEach((entry) => mergeServerEvent(entry, 'call'));
+        (data.sms || []).forEach((entry) => mergeServerEvent(entry, 'sms'));
+        (data.transcriptions || []).forEach((entry) => mergeServerEvent(entry, 'transcript'));
+      } catch {
+        pushLog('server', { event: 'poll_error', detail: 'Could not fetch server logs' });
+      }
+    }
+
+    async function initAfterAuth() {
+      await whoAmI();
+      ui.authOverlay.style.display = 'none';
+      setStatus('Connecting Voice', 'calling');
+      await initVoice();
+      renderLogs();
+      clearInterval(state.pollRef);
+      state.pollRef = setInterval(pollServerLogs, 8000);
+      pollServerLogs();
+    }
+
+    ui.loginForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      ui.authMsg.textContent = '';
+      const username = ui.usernameInput.value.trim();
+      const password = ui.passwordInput.value;
+      try {
+        await login(username, password);
+        await initAfterAuth();
+      } catch (err) {
+        ui.authMsg.textContent = err.message || 'Login failed';
+      }
+    });
+
+    ui.callBtn.addEventListener('click', makeCall);
+    ui.hangBtn.addEventListener('click', hangUp);
+    ui.muteBtn.addEventListener('click', toggleMute);
+    ui.sendSmsBtn.addEventListener('click', sendSms);
+
+    ui.acceptIncomingBtn.addEventListener('click', () => {
+      if (!state.incomingCall) return;
+      state.incomingCall.accept();
+      ui.incomingBox.style.display = 'none';
+      setCallButtons(true);
+      pushLog('calls', { event: 'incoming_accepted' });
+      state.incomingCall = null;
+    });
+
+    ui.rejectIncomingBtn.addEventListener('click', () => {
+      if (!state.incomingCall) return;
+      state.incomingCall.reject();
+      ui.incomingBox.style.display = 'none';
+      setStatus('Ready', 'ready');
+      pushLog('calls', { event: 'incoming_rejected' });
+      state.incomingCall = null;
+    });
+
+    ui.logoutBtn.addEventListener('click', logout);
+
+    setControlsEnabled(false);
+    setCallButtons(false);
+    renderLogs();
+
+    if (state.token) {
+      initAfterAuth().catch(() => logout());
+    }
+  </script>
+</body>
+</html>
